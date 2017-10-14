@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html>
+  <head> <title>Logits Scales</title></head>
+      <meta charset="utf-8">
+  <meta content="IE=edge" http-equiv=X-UA-Compatible>
+  <meta content="width=device-width,initial-scale=1" name=viewport>
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css" integrity="sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M" crossorigin="anonymous">
+<link rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+<script type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+	<style>
+	.nav-pills > li > a.active {
+    background-color:#ffeeee!important;
+	color:#000000!important;
+	font-weight: bold!important;
+		padding: 0px 0px!important;
+}
+	.nav-pills > li > a {
+	color:#777777!important;
+	padding: 0px 0px!important;
+}
+</style>
+<style>
+  .borderless tr, .borderless td, .borderless th {
+    border: none !important;
+   }
+</style>
+<body background=#FFFFFF>
+  <h4>
+<nav class="navbar navbar-expand-md navbar-light" style="background-color: #e3f2fd;">
+  <button class="navbar-toggler navbar-toggler-right" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+  <nav class="navbar navbar-light bg-faded">
+  <a class="navbar-brand" href="index.html">Kin Kwan Leung</a>
+  </nav>
+  <div class="collapse navbar-collapse" id="navbarNav">
+    <ul class="navbar-nav  mx-auto w-100 justify-content-center">
+      <li class="nav-item btn-outline-info">
+        <a class="nav-link" href="housing.html">Zillow</a>
+      </li>
+      <li class="nav-item active">
+        <a class="nav-link" href="logits.html">Logits<span class="sr-only">(current)</span></a>
+      </li>
+      <li class="nav-item btn-outline-info">
+        <a class="nav-link" href="image.html">Carvana</a>
+      </li>
+      <li class="nav-item btn-outline-info">
+        <a class="nav-link" href="cv.html">CV</a>
+      </li>
+      <li class="nav-item btn-outline-info">
+        <a class="nav-link" href="contact.html">Contact</a>
+      </li>
+    </ul>
+  </div>
+</nav></h4>
+<div class="container-fluid">
+<div class="row">
+<div class="col-3" style="background:#fee;">
+	<nav id="navbar-example3" class="navbar navbar-light" role="navigation">
+  <ul class="nav nav-pills flex-column">
+	  <li><div class="navbar-brand"><b>Testing Logits Scales</b></div></li>
+    <li><a class="nav-link" href="#intro">Introduction</a></li>
+    <li><a class="nav-link" href="#logistic">Logistic Function</a></li>
+    <li><a class="nav-link" href="#softmax">Softmax</a></li>
+    <li><a class="nav-link" href="#prelim">Preliminary Analysis</a></li>
+	<ul class="nav nav-pills flex-column">
+      <li><a class="nav-link ml-3 my-0" href="#note1">Note 1</a></li>
+      <li><a class="nav-link ml-3 my-0" href="#note2">Note 2</a></li>
+	  <li><a class="nav-link ml-3 my-0" href="#note3">Note 3</a></li>
+    </ul>
+    <li><a class="nav-link" href="#demo">Demo</a></li>
+    <li><a class="nav-link" href="#results">Results</a></li>
+    <ul class="nav nav-pills flex-column">
+      <li><a class="nav-link ml-3 my-0" href="#fullyconnected">Fully Connected</a></li>
+      <li><a class="nav-link ml-3 my-0" href="#cnn">CNNs</a></li>
+    </ul>
+    <li><a class="nav-link" href="#conclusion">Conclusion</a></li>
+    <li><a class="nav-link" href="#sourcecode">Code</a></li>
+	<li><a class="nav-link" href="logitdemo.html">Full Demo</a></li>
+  </ul>
+</nav>
+</div><div class="col-9">
+<div data-spy="scroll" data-target="#navbar-example3" data-offset="0" style="overflow-y: scroll;height:calc(100vh - 80px);padding-right:50px;text-align:justify;margin-right:-14px">
+  <h4 id="intro"><b>Introduction</b></h4>
+  <p>&nbsp;</p>
+  <p>When I was learning how to use CNN to tackle the <a href="https://www.kaggle.com/c/carvana-image-masking-challenge">Carvana Competition</a> on <a href="http://www.kaggle.com/">Kaggle</a>, I came across with <a href="https://arxiv.org/pdf/1606.02147.pdf">ENet</a> that was used for Semantic Segmentation. I skimmed through a <a href="https://arxiv.org/pdf/1606.02147.pdf">paper</a> and looked at some <a href="https://github.com/kwotsin/TensorFlow-ENet/blob/master/enet.py">sample code</a> online, and I started writing my code for the ENet. If x is my input, then \(z\)=ENet(\(x\)) is the set of logits I used for the calculation of the sigmoid cross entropy. I was not sure if I have made any mistakes in the codes, but using the Xavier initialization of the weights, the output \(Z\) are really large - about \(10^{40}\) or more. As ENet is composed of many "bottleneck" layers, I found out that after each pass of these bottleneck layers, the scale of the output is increased by a factor of 10. Thus, I tried to "manually" divide the output by 10 and the ENet finally kinda worked (far from perfectly, but at least the loss function is not NaN anymore and it is decreasing when training.</p>
+  <p>Because of this, I would like to investigate the effect of training and performance with different scales of logits using the famous MNIST data. (I cannot find anything online about this topics - but I think this is a very common question.)</p>
+  <p>&nbsp;</p>
+  <h4 id="logistic"><b>Logistic Function \( y = \sigma(z) = \frac{1}{1+e^{-z}}\)</b></h4>
+  <p>&nbsp;</p>
+  <p>The logistic function maps an input \(z\in\mathbb{R}\) to \(\sigma(z)\in (0,1)\). We can interpret \(\sigma(z)\) as a probability of the unit being turned on, as the logit \(\sigma(z)\) is between 0 and 1. Note that</p> 
+  <ul>
+  <li> \( f(0) = 0.5\)</li>
+  <li> If \(z<0 \), then \( \sigma(z) < 0.5\), which indicates that the unit is less likely to be turned on.</li>
+  <li> If \(z>0 \), then \( \sigma(z) > 0.5\), which indicates that the unit is more likely to be turned on.</li>
+  </ul>
+  <p>If we <i>scale</i> \(z\) by a factor of \(\alpha\), the above properties won't change. But the change of the probability will be more/less sensitive.</p>
+  <p>For example, let \(z=1\). Then \(\sigma(0.1z)\approx 0.52,\,\sigma(z)\approx 0.73\) and \( \sigma(10z)\approx 0.99995\). Note that a positive \(z\) as above is interpreted as the unit being more likely to be turned on. The scale control "how" more likely. We can see that for \( \sigma(0.1z)\) it is just very slightly more likely, but  for \(\sigma(10z)\) it is super-duper likely that the unit is turned on. Refer to the graphs below.</p>
+	<p><center><img src='/logits/logistic.jpg'></center></p>
+  <p> Thus <b> scaling the logits \(z\) changes the sensitivity of the output.</b></p>
+  <p>&nbsp;</p>
+  <h4 id="softmax"><b>Softmax \( y = softmax(z)\)</b></h4>
+  <p>&nbsp;</p>
+  <p>The softmax function \(y = softmax(z)\) is a generalization of the above logistic function. Instead of thinking the unit being turned on and off, we say that $z$ can be in two states - "on" or "off". The sum of theprobability of the unit being "on" and the probability of the unit being "off" should be 1. Let \(y_{on} = \sigma(z)\) be the logistic output of the logit \(z\). Then we should have \(y_{off} = 1 - \sigma(z)\). Note that 
+$$y_{on}=\sigma(z) = \frac{1}{1+e^{-z}} = \frac{e^z}{e^z + 1} = \frac{e^z}{e^z + e^0}$$
+and
+$$y_{off}= 1 - \sigma(z) = 1 - \frac{1}{1+e^{-z}} = \frac{e^{-z}}{1 + e^{-z}} = \frac{1}{e^z + 1} = \frac{e^0}{e^z + e^0}$$</p>
+<p>Thus we can think of the input \(z\) corresponds to \(z_{on} = z\) and \(z_{off} = 0\), with 
+$$ y_{on} = \frac{e^{z_{on}}}{e^{z_{on}} + e^{z_{off}}}\mbox{   and   }   y_{off} = \frac{e^{z_{off}}}{e^{z_{on}} + e^{z_{off}}}$$</p>
+
+<p>The advantage of this point of view is that if the output has several states, instead of just 2 (being either <i>on</i> or <i>off</i>), we can use the above formula to convert numbers into probabilities, such that a larger number of the state input corresponds to a larger probability of that state. </p>
+
+<p>Let \(z_i\) be the input of the \(i\)<sup>th</sup> state and \(y_i\) be the probabilities. Then we have
+$$ y_i = \frac{e^{z_i}}{\sum_j e^{z_j}} = \frac{e^{z_i}}{e^{z_1} + \ldots e^{z_n}} \quad\quad\mbox{(number of states}=n)$$</p>
+
+<p>Let's do an example. Let's say there are 4 states such that \((z_1, z_2, z_3, z_4) = (2,2,4,-1)\). We can see that there state 1 and state 2 should happen equally likely, but state 3 is most likely to happen. We can use the above formulae to calculate the probabilities \(y_i\) as below,
+$$e^{z_1} + e^{z_2} + e^{z_3} + e^{z_4} = e^2 + e^2 + e^4 +e^{-1}\approx 69.74$$
+Thus
+$$y_1 \approx \frac{e^2}{69.74}\approx 0.106, \quad\quad y_2 \approx \frac{e^2}{69.74} \approx 0.106,\quad\quad y_3 \approx \frac{e^4}{69.74} \approx 0.783,\quad\quad y_4 \approx \frac{e^{-1}}{69.74}\approx 0.005$$</p>
+
+<p>We can see that it agrees with our predictions. To simplify notation, we write \(y = (y_1, \ldots, y_n)\) and \(z=(z_1,\ldots, z_n)\) and \(y = softmax(z)\). Note that both \(y\) and \(z\) are vectors here. We will still be referring \(z\) as <b>logits</b>.</p>
+
+<p>A nice property of softmax is that it is translation invariant, i.e. \(softmax(z + C) = softmax(z)\). It can be easily shown as
+$$softmax(z+C) = \left(\frac{e^{z_i+C}}{\sum_j e^{z_j+C}}\right) = \left(\frac{e^{z_i}e^C}{\sum_j e^{z_j}e^C}\right) = \left(\frac{e^{z_i}}{\sum_j e^{z_j}}\right)=softmax(z)$$</p>
+
+<p>Of course \(C\) has to be the same across all states, i.e. \(C\) is broadcasted to \(z_j\).</p>
+
+<p>Although the softmax function is translation invariant, it is not scale invariant. Again, just like the logistic function, it control the sensitivity of the probability output \(y_i\). Using the example above, if \(z = (2,2,4,1)\), then
+<ul>
+<li> \(softmax(0.001z)\approx (0.25,0.25,0.25,0.25)\)</li>
+<li> \(softmax(z) \approx(0.106,0.106,0.783,0.005)\)</li>
+<li>  \(softmax(0.5z) \approx (0.202,0.202,0.550,0.045)\)</li>
+<li>  \(softmax(2z) \approx (0.017,0.017,0.965,0)\)</li>
+<li>  \(softmax(10z) \approx (0,0,1,0)\)</li>
+	</ul></p>
+	<p><center>
+		<img src="/logits/softmax0001.jpg" width="300px">
+		<img src="/logits/softmax05.jpg" width="300px">
+		<img src="/logits/softmax1.jpg" width="300px">
+		<img src="/logits/softmax2.jpg" width="300px">
+		<img src="/logits/softmax10.jpg" width="300px">
+		</center></p>
+<p>Scaling with a larger number will result in very close to hardmax (hence the name softmax) while scaling with a very small number will be close to the point where the states are all equally likely to happen.</p>
+  <p>&nbsp;</p>
+  <h4 id="prelim"><b>Preliminary Analysis</b></h4>
+  <p>&nbsp;</p> <p>After a short introduction, we can start with some theoretical analysis with the MNIST data. We let
+  <ul>
+<li>  \(x\) - the input (`shape = [num_data, 784] or [num_data, 28,28]`). </li>
+<li>  \(z = f(x;\theta)\) - the logits given parameters \(\theta\) in a given network architecture \(f\). (`z.shape = [num_data, 10]`)</li>
+<li> \(\hat{y} = softmax(z)\) - our prediction probability. (`shape = [num_data, 10]`)</li>
+<li> \(y\) - labels. (`shape = [num_data, 10]` after one-hot)</li>
+</ul>
+</p>
+<p>Then the loss function is given by
+$$L(x;\theta)=-\sum y_i \log \hat{y}_i$$</p>
+
+<p>To reduce the loss, i.e. to train the model, we looked at the derivatives of \(L\) with respect to \(\theta\). We first have
+$$\dfrac{\partial L}{\partial z} =\hat{y}- y$$
+(Here both \(y\) and \(z\) are vectors.) Thus by chain rules, we have
+$$\dfrac{\partial L}{\partial \theta} =(\hat{y} - y) \dfrac{\partial }{\partial \theta}\,f(x;\theta)$$
+(Note that all of these are indeed vectors and matrices)</p>
+
+<p>Now we are trying to scale the logits, i.e.  let
+<ul>
+<li> \(\hat{\tilde{y}} = softmax(\alpha z)\) for some \(\alpha > 0\)</li>
+</ul></p>
+
+<p>We then have
+$$\dfrac{\partial \tilde{L}}{\partial z} =\alpha(\hat{\tilde{y}}- y)$$</p>
+
+<p>This means 
+$$\dfrac{\partial \tilde{L}}{\partial \theta} =\alpha(\hat{\tilde{y}} - y) \dfrac{\partial }{\partial \theta}\,f(x;\theta)$$
+</p>
+<p>This means that <b>if we scale our logits by a factor of \(\alpha\), the gradient is also (apparently) scaled by a factor of \(\alpha\)</b>. Of course it is <i>not that simple</i>, because if we scaled the logits, our probability vectors \(\hat{y}\) changed and thus our losses also changed. It is very difficult to analyze how the training would turn out, but we can <i>try</i> to ignore the changes in our losses and just think that the gradient is just scaled by a factor of \(\alpha\). Since we used the gradient for our learning, <b>scaling the logits by a factor of \(\alpha\) is similar to scaling our learning rate by a factor of \(1/\alpha\)</b>, ignoring the (huge) possible effects of the changes in the loss function.</p> <p>&nbsp;</p>
+  <h5 id="note1">Note 1</h5>
+  <p>In the most popular initializations of the weights \(\theta\), the scaled logits \(\alpha z\) (for large \(\alpha\)) may be very large and thus the loss function \(L\) is also very large. This is because
+$$\log \hat{y}_i =\log \frac{e^{z_i}}{\sum_j e^{z_j}} =\log\frac{1}{1+\sum_{j\neq i} e^{z_j−z_i}} =−\log\left(1+\sum_{j\neq i} e^{z_j−z_i}\right)$$</p>
+<p>When \(z\) is replaced by \(\alpha z\), we have
+$$\log \hat{\tilde{y}}_i = -\log\left(1+\sum_{j\neq i} e^{\alpha(z_j - z_i)}\right)$$
+	</p><p>
+Assume that for some \(\alpha(z_j - z_i)\) is positive and huge (say when \(j=J\) ), then 
+$$-\log\left(1+\sum_{j\neq i} e^{\alpha(z_j - z_i)}\right)\approx -\log e^{\alpha(z_J - z_i)} = -\alpha (z_J - z_i).$$</p>
+
+<p>This means that <b>if we adjusted our learning rate by the scale \(\alpha\) (divided by \(\alpha\) ), the decrease in \(L\) would be small. Thus it should not be wise to adjust our learning rate when \(\alpha\) is large</b>.</p><p>&nbsp;</p>
+<h5 id="note2">Note 2</h5>
+<p>If \(\alpha\) is small, then we have
+$$\log \hat{\tilde{y}}_i = -\log\left(1+\sum_{j\neq i} e^{\alpha(z_j - z_i)}\right) \approx -\log\left(1+\sum_{j\neq i} 1\right)\approx -\log 10$$
+which is close to a constant. Thus \(L\) very insensitive to changes. This seems to suggest that adjusting the learning rate is necessary. (Like dividing by \(\alpha\) </p>
+<p>&nbsp;</p>
+  <h5 id="note3">Note 3</h5>
+  <p>It is anticipated the training would (hopefully) eventually train our scaled logits to a specific confortable range, no matter what \(\alpha\) is. This is because if our initial prediction is incorrect, (if it is correct, why would we train?), then the logits must have to flip the sign (crossing 0). Thus if \(\alpha\) is huge, after training the network for a while, we would expect our weights \(\theta\) to be very small (hence our loss \(L\) would fall into a desirable range). The unscaled logits \(z\) will be small and \(\alpha z\) would fall into the desired range. This means \(\frac{\partial f}{\partial \theta}\) should stay in the same order of magnitude. If we adjust the learning rate as above, \(L\) should decrease accordingly. This seems to suggest that for a large scale \(\alpha\), we should adjust the learning rate in the beginning but we can adjust it after the scaled logits falls into the desired range.</p> <p>&nbsp;</p>
+  <h4 id="demo"><b>Demo</b></h4>
+  <p>&nbsp;</p> <p>After the above preliminary analysis, we are going to do some tests to see how the scaling of the logits would affect our training.</p>
+
+<p>We are doing the followings,
+<ul>
+<li>  We are using 98% of our data as training set and 2% of our data as test set. </li>
+<li>  <p>We are investigating several archictecture including a fully connected net and three CNNs. We will be focusing on the fully connected set.</p>
+<p> Fully Connected:</p>
+<p align="center"><img src="/logits/fullyconnected.png"></p>
+<p> Convolutional Neural Network 1:</p>
+<p align="center"><img src="/logits/cnn1.png"></p>
+<p> Convolutional Neural Network 2:</p>
+<p align="center"><img src="/logits/cnn2.png"></p>
+<p> Convolutional Neural Network 3:</p>
+<p align="center"><img src="/logits/cnn3.png"></p>
+</li></li>
+<li>  We are using Xavier initialization for the weights and zero initialization for the bias</li>
+<li>  Minibatch Size is 1024.</li>
+<li>  We will be keeping track of the standard deviation of the logits</li>
+<li> You may wonder why the accuracy is very low compared to some other models training specifically for the MNIST data. We were just testing the scales of the logits, not aiming for very high accuracy of the model.</li>
+</ul>
+</p>
+<p>We will be testing different cases based on the followings,
+<ul>
+<li>  We will be testing on 4 scale sets. 
+<ul>
+<li>A: \([0.1,0.3,1,3,10]\)</li>
+<li>B: \([0.01,0.1,1,10,100]\)</li>
+<li>C: \([10^{-8},10^{-6},10^{-4},10^{-1},1]\)</li>
+<li>D: \([1,10^2, 10^4,10^6,10^8]\)</li>
+</ul>
+<li>  Our base learning rates are \(10^{-2}, 10^{-3}, 10^{-4}\) and \(10^{-6}\). </li>
+<li>  We will try both adjusting the learning rates and not adjusting them.</li>
+<li>  We are using both gradient descent optimizer and Adam optimizer.</li>
+<li>  The number of epochs will be 10 and 50 for the fully connected network, and 10 for the CNNs.</li>
+<li>  We will interpret our result using a fixed random state 0. We also include results when the random state is None.</li>
+</ul>
+We ran this notebook on <a href="www.kaggle.com">Kaggle</a> Kernel.</p> <p>&nbsp;</p>
+	<h4 id="results"><b>Results</b></h4><p>&nbsp;</p>
+<ul><li> Our main graphs are based on Accuracy (in percent) on the test set vs Training time (logged every 3 minibatches).</li>
+<li> We also logged the Standard Deviation of the Scaled Logits within a minibatch every 3 minibatches. These graphs are recorded starting from the 21st data points since the scales are too huge while not in logarithmic scale. An improvement would be outputing those in logarithmic scale - but we did not do it this time. Thus some of the graphs are pretty bad in scales.</li>
+<li> We also include a training and test error as a percent of initial training and test error over 10 epochs. </li> 
+</ul>
+<p>&nbsp;</p>
+  <h5 id="fullyconnected">Fully Connected</h5>
+  <p>&nbsp;</p> <p>
+  <ul>
+  <li>A Typical graph would be like below.<center>
+	<span class="badge badge-dark">Scale Set A</span>
+	<span class="badge badge-primary">Learning Rate = 0.001</span>
+	<span class="badge badge-success">Learning Rate Adjusted</span>
+	<span class="badge badge-info">Gradient Descent Optimizer</span>
+	<span class="badge badge-warning">50 Epochs</span>
+	<span class="badge badge-danger">Fixed Random State</span><br>
+	<img src="/logits/FCGD1e-3TTA50-ACC.jpg"></center><br>
+	We can see that no scaling is not necessarily the best. Indeed here, we can see that the scale \(\alpha = 0.1\) is the best.</li><br>
+  <li>Some more graphs are shown below.<center>
+	<span class="badge badge-dark">Scale Set A</span>
+	<span class="badge badge-info">Gradient Descent Optimizer</span>
+	<span class="badge badge-warning">50 Epochs</span>
+	<span class="badge badge-danger">Fixed Random State</span><br></center><hr>
+<table class="table table-sm table-condensed table-responsive borderless">
+	<tr>
+	<td>&nbsp;</td>
+	<td style="text-align:center;"><span class="badge badge-primary">Learning Rate = 0.001</span></td>
+	<td style="text-align:center;"><span class="badge badge-primary">Learning Rate = 0.0001</span></td>
+	</tr>
+	<tr>
+	<td style="vertical-align:middle;text-align:center;">
+	<span class="badge badge-success">Learning Rate Adjusted</span>
+	</td>
+	<td style="text-align:center;"><img src="/logits/FCGD1e-3TTA50-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/FCGD1e-4TTA50-ACC.jpg" width="300px"></td>
+	</tr>
+	<tr>
+	<td style="vertical-align:middle;text-align:center;">
+	<span class="badge badge-success">Learning Rate Unadjusted</span>
+	</td>
+	<td style="text-align:center;"><img src="/logits/FCGD1e-3FTA50-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/FCGD1e-4FTA50-ACC.jpg" width="300px"></td>
+	</tr>
+	</table><br>
+	We can see that with learning rate as 0.001 and adjusted, a scale of 0.1 yields the best result after 50 epochs. It is interesting to see larger scales would yield the worst result by basically collapsing the accuracy. It also seems like adjusted learning rate would yield a better result.<br><br><center>
+	<span class="badge badge-dark">Scale Set B</span>
+	<span class="badge badge-info">Gradient Descent Optimizer</span>
+	<span class="badge badge-warning">50 Epochs</span>
+	<span class="badge badge-danger">Fixed Random State</span><br></center><hr>
+	<table class="table table-sm table-condensed table-responsive borderless">
+	<tr>
+	<td>&nbsp;</td>
+	<td style="text-align:center;"><span class="badge badge-primary">Learning Rate = 0.001</span></td>
+	<td style="text-align:center;"><span class="badge badge-primary">Learning Rate = 0.0001</span></td>
+	</tr>
+	<tr>
+	<td style="vertical-align:middle;text-align:center;">
+	<span class="badge badge-success">Learning Rate Adjusted</span>
+	</td>
+	<td style="text-align:center;"><img src="/logits/FCGD1e-3TTB50-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/FCGD1e-4TTB50-ACC.jpg" width="300px"></td>
+	</tr>
+	<tr>
+	<td style="vertical-align:middle;text-align:center;">
+	<span class="badge badge-success">Learning Rate Unadjusted</span>
+	</td>
+	<td style="text-align:center;"><img src="/logits/FCGD1e-3FTB50-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/FCGD1e-4FTB50-ACC.jpg" width="300px"></td>
+	</tr>
+	</table><br>
+	Since scale=0.1 is the best in the previous graphs, we looked at 0.01. Wow, when the learning rate is adjusted, they give the best results. While the learning rate is unadjusted, seems like 0.01 is a little to small. Again large scales usually yield very bad results unless we tune down the learning rate.<br><br><center>
+	<span class="badge badge-dark">Scale Set A</span>
+	<span class="badge badge-info">Adam Optimizer</span>
+	<span class="badge badge-warning">50 Epochs</span>
+	<span class="badge badge-danger">Fixed Random State</span><br></center><hr>
+	<table class="table table-sm table-condensed table-responsive borderless">
+	<tr>
+	<td>&nbsp;</td>
+	<td style="text-align:center;"><span class="badge badge-primary">Learning Rate = 0.001</span></td>
+	<td style="text-align:center;"><span class="badge badge-primary">Learning Rate = 0.0001</span></td>
+	</tr>
+	<tr>
+	<td style="vertical-align:middle;text-align:center;">
+	<span class="badge badge-success">Learning Rate Adjusted</span>
+	</td>
+	<td style="text-align:center;"><img src="/logits/FCAD1e-3TTA50-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/FCAD1e-4TTA50-ACC.jpg" width="300px"></td>
+	</tr>
+	<tr>
+	<td style="vertical-align:middle;text-align:center;">
+	<span class="badge badge-success">Learning Rate Unadjusted</span>
+	</td>
+	<td style="text-align:center;"><img src="/logits/FCAD1e-3FTA50-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/FCAD1e-4FTA50-ACC.jpg" width="300px"></td>
+	</tr>
+	</table><br>
+	This is for the Adam Optimizer. Note that it is similar to the Gradient Descent Optimizer, but it performed a little bit better. Note that the graph for unadjusted learning rate with a base learning rate of 0.001, we see that when the scale is 10, the accuracy goes down very quickly and then slowly increases. This can be a phenomenon of setting the learning rate too high, while sometimes there will be exploding gradients. Luckily it was not too high so that the accuracy cannot recover. This agrees with our prediction that setting the logit scale higher will be similar to scaling the learning rate.</li><br>
+	<li> This graph is kinda interesting. <center>
+	<span class="badge badge-dark">Scale Set A</span>
+	<span class="badge badge-primary">Learning Rate = 0.000001</span>
+	<span class="badge badge-success">Learning Rate Unadjusted</span>
+	<span class="badge badge-info">Gradient Descent Optimizer</span>
+	<span class="badge badge-warning">50 Epochs</span>
+	<span class="badge badge-danger">Fixed Random State</span><br><hr>
+	<img src="/logits/FCGD1e-6FTA50-ACC.jpg"></center><br>
+	Note that if the learning rate is small, scaling the logits will help the training - however, we don't know what the endgame would be - and we cannot tune it down afterwards as all the weights \(\theta\) are very much different. (Or can we? I don't know)</li><br>
+	<li> To see if our observation in <a href="#note2">Note 2</a> is correct.<center>
+	<span class="badge badge-dark">Scale Set C</span>
+	<span class="badge badge-primary">Learning Rate = 0.0001</span>
+	<span class="badge badge-success">Learning Rate Adjusted</span>
+	<span class="badge badge-info">Gradient Descent Optimizer</span>
+	<span class="badge badge-warning">50 Epochs</span>
+	<span class="badge badge-danger">Fixed Random State</span><br><hr>
+	<img src="/logits/FCGD1e-4TTC50-ACC.jpg"></center><br>
+	It seems like what we predicted was true up until our learning rate is \(10^{-8}\). Note that there are some gradient explosion on \(10^{-6}\).</li><br>
+	<li> More...<center>
+	<span class="badge badge-dark">Scale Set C</span>
+	<span class="badge badge-primary">Learning Rate = 0.001</span>
+	<span class="badge badge-success">Learning Rate Unadjusted</span>
+	<span class="badge badge-info">Adam Optimizer</span>
+	<span class="badge badge-warning">50 Epochs</span>
+	<span class="badge badge-danger">Fixed Random State</span><br><hr>
+	<img src="/logits/FCAD1e-3FTC50-ACC.jpg"></center><br>
+	This is a mystery of the Adam Optimizer. While the gradient descent counterpart agreed with our prediction on <a href="note2">Note 2</a>. The Adam Optimizer changes everything..</li><br>
+	<li> More...<center>
+		<span class="badge badge-dark">Scale Set B</span>
+	<span class="badge badge-info">Adam Optimizer</span>
+	<span class="badge badge-warning">50 Epochs</span>
+	<span class="badge badge-danger">Fixed Random State</span><br></center><hr>
+	<table class="table table-sm table-condensed table-responsive borderless">
+	<tr>
+	<td>&nbsp;</td>
+	<td style="text-align:center;"><span class="badge badge-primary">Learning Rate = 0.001</span></td>
+	<td style="text-align:center;"><span class="badge badge-primary">Learning Rate = 0.0001</span></td>
+	</tr>
+	<tr>
+	<td style="vertical-align:middle;text-align:center;">
+	<span class="badge badge-success">Learning Rate Adjusted</span>
+	</td>
+	<td style="text-align:center;"><img src="/logits/FCAD1e-3TTB50-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/FCAD1e-4TTB50-ACC.jpg" width="300px"></td>
+	</tr>
+	<tr>
+	<td style="vertical-align:middle;text-align:center;">
+	<span class="badge badge-success">Learning Rate Unadjusted</span>
+	</td>
+	<td style="text-align:center;"><img src="/logits/FCAD1e-3FTB50-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/FCAD1e-4FTB50-ACC.jpg" width="300px"></td>
+	</tr>
+	</table><br>
+	For the Adam Optimizer, it is interesting that in some cases, the accuracy went up at a peak but that plunges. This can be explained because the learning rate is high. For example if the learning rate is adjusted, a small scale would trigger the effect. Similarly, if the learning rate is unadjusted, a large scale would trigger the effect because again, scaling the logits is similar to scaling the learning rate.</li>	<br>
+	<li> The following graphs are very surprising!<center>
+	<span class="badge badge-dark">Scale Set D</span>
+	<span class="badge badge-primary">Learning Rate = 0.0001</span>
+	<span class="badge badge-success">Learning Rate Adjusted</span>
+	<span class="badge badge-info">Gradient Descent Optimizer</span>
+	<span class="badge badge-warning">50 Epochs</span>
+	<span class="badge badge-danger">Fixed Random State</span><br><hr>
+	<img src="/logits/FCGD1e-4TTD50-ACC.jpg"><br><br></center>
+	Note that for Gradient Descent Optimizer, this phenomenon agrees on what we said - scaling the logits is similar to scaling the learning rate. Since we adjusted the learning rate, the trend in accuracy should be similar. But it seems to only work for this base learning rate (0.0001)<br><center>
+	<span class="badge badge-dark">Scale Set D</span>
+	<span class="badge badge-success">Learning Rate Unadjusted</span>
+	<span class="badge badge-info">Adam Optimizer</span>
+	<span class="badge badge-warning">50 Epochs</span>
+	<span class="badge badge-danger">Fixed Random State</span><br></center><hr>
+	<table class="table table-sm table-condensed table-responsive borderless">
+	<tr>
+	<td style="text-align:center;"><span class="badge badge-primary">Learning Rate = 0.0001</span></td>
+	<td style="text-align:center;"><span class="badge badge-primary">Learning Rate = 0.000001</span></td>
+	</tr>
+	<tr>
+	<td style="text-align:center;"><img src="/logits/FCAD1e-4FTD50-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/FCAD1e-6FTD50-ACC.jpg" width="300px"></td>
+	</tr>
+	</table><br>
+	The phenomenon occurs again but with <i>Adam Optimizer</i> and <i>Unadjusted learning rate</i>. This is very surprising and it disagrees with what we think it would heppen. Does it have something to do with the memory of the Adam Optimizer? Or maybe the learning rate is automatically adjusted by the Optimizer? Maybe it is because of what we said in <a href="#note1">Note 1</a>?</li><br>
+	<li> The followings are some comparisons.
+	<ul>
+	<li>Random States Comparison<center>
+	<span class="badge badge-dark">Scale Set A</span>
+	<span class="badge badge-primary">Learning Rate = 0.001</span>
+	<span class="badge badge-success">Learning Rate Adjusted</span>
+	<span class="badge badge-info">Gradient Descent Optimizer</span>
+	<span class="badge badge-warning">10 Epochs</span><br></center><hr>
+	<table class="table table-sm table-condensed table-responsive borderless">
+	<tr>
+	<td style="text-align:center;"><span class="badge badge-danger">Fixed Random State</span></td>
+	<td style="text-align:center;"><span class="badge badge-danger">Random State</span></td>
+	</tr>
+	<tr>
+	<td style="text-align:center;"><img src="/logits/FCGD1e-3TTA10-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/FCGD1e-3TFA10-ACC.jpg" width="300px"></td>
+	</tr>
+	</table><br>
+	It is clear that different optimization does make a huge difference in some of the cases. Of course if the random state is not fixed, the graph can be anything. The graph on the right hand side is just one of the many randomness. </li><br>
+	<li>Optimizer Comparison<center>
+	<span class="badge badge-dark">Scale Set A</span>
+	<span class="badge badge-success">Learning Rate Adjusted</span>
+	<span class="badge badge-warning">50 Epochs</span>
+	<span class="badge badge-danger">Fixed Random State</span><br></center><hr>
+	<table class="table table-sm table-condensed table-responsive borderless">
+	<tr>
+	<td>&nbsp;</td>
+	<td style="text-align:center;"><span class="badge badge-primary">Learning Rate = 0.001</span></td>
+	<td style="text-align:center;"><span class="badge badge-primary">Learning Rate = 0.0001</span></td>
+	</tr>
+	<tr>
+	<td style="vertical-align:middle;text-align:center;">
+	<span class="badge badge-info">Gradient Descent Optimizer</span>
+	</td>
+	<td style="text-align:center;"><img src="/logits/FCGD1e-3TTA50-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/FCGD1e-4TTA50-ACC.jpg" width="300px"></td>
+	</tr>
+	<tr>
+	<td style="vertical-align:middle;text-align:center;">
+	<span class="badge badge-info">Adam Optimizer</span>
+	</td>
+	<td style="text-align:center;"><img src="/logits/FCAD1e-3TTA50-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/FCAD1e-4TTA50-ACC.jpg" width="300px"></td>
+	</tr>
+	</table><br>
+	We can see that in both cases, Adam Optimizer performs better, which is not a surprise. </li><br>
+	<li>Other Comparisons<center>
+	<span class="badge badge-dark">Scale Set B</span>
+	<span class="badge badge-success">Learning Rate Adjusted</span>
+	<span class="badge badge-info">Gradient Descent Optimizer</span>
+	<span class="badge badge-warning">50 Epochs</span>
+	<span class="badge badge-danger">Fixed Random State</span><br></center><hr>
+	<table class="table table-sm table-condensed table-responsive borderless">
+	<tr>
+	<td style="text-align:center;"><span class="badge badge-primary">Learning Rate = 0.001</span></td>
+	<td style="text-align:center;"><span class="badge badge-primary">Learning Rate = 0.0001</span></td>
+	</tr>
+	<tr>
+	<td style="text-align:center;"><img src="/logits/FCGD1e-3TTB50-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/FCGD1e-4TTB50-ACC.jpg" width="300px"></td>
+	</tr>
+	</table><br>
+	We are looking at <i>Scale = 0.1</i> on the left and <i>Scale = 0.01</i> on the right. Note that they have the same adjusted learning rate - \( \frac{0.001}{0.1} = \frac{0.0001}{0.01} = 0.01\). Note that both lines are very similar.<br> However, for <i>Scale = 1</i> on the left and <i>Scale = 0.1</i> on the right, even though they have the same adjusted learning rate, they are pretty different. This can be seen in other cases in the above graphs.</li><br>
+	<li>Similar for Adam...<center>
+	<span class="badge badge-dark">Scale Set B</span>
+	<span class="badge badge-success">Learning Rate Adjusted</span>
+	<span class="badge badge-info">Adam Optimizer</span>
+	<span class="badge badge-warning">50 Epochs</span>
+	<span class="badge badge-danger">Fixed Random State</span><br></center><hr>
+	<table class="table table-sm table-condensed table-responsive borderless">
+	<tr>
+	<td style="text-align:center;"><span class="badge badge-primary">Learning Rate = 0.001</span></td>
+	<td style="text-align:center;"><span class="badge badge-primary">Learning Rate = 0.0001</span></td>
+	</tr>
+	<tr>
+	<td style="text-align:center;"><img src="/logits/FCAD1e-3TTB50-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/FCAD1e-4TTB50-ACC.jpg" width="300px"></td>
+	</tr>
+	</table><br>
+	We are doing the above comparisons for the Adam Optimizer. Note that most of them are not similar except for <i>Scale = 100 on the left and Scale = 10 on the right</i> and <i> Scale = 10 on the left and Scale = 1 on the right</i></li><br>
+	<li>But things worked out in the following case for Adam.<center>
+	<span class="badge badge-dark">Scale Set B</span>
+	<span class="badge badge-success">Learning Rate Adjusted</span>
+	<span class="badge badge-info">Adam Optimizer</span>
+	<span class="badge badge-warning">50 Epochs</span>
+	<span class="badge badge-danger">Fixed Random State</span><br></center><hr>
+	<table class="table table-sm table-condensed table-responsive borderless">
+	<tr>
+	<td style="text-align:center;"><span class="badge badge-primary">Learning Rate = 0.0001</span></td>
+	<td style="text-align:center;"><span class="badge badge-primary">Learning Rate = 0.000001</span></td>
+	</tr>
+	<tr>
+	<td style="text-align:center;"><img src="/logits/FCAD1e-4TTB50-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/FCAD1e-6TTB50-ACC.jpg" width="300px"></td>
+	</tr>
+	</table><br>
+	Note that if we compare the above 2 graphs for really small base learning rates, all the accuracies for the same agreed adjusted learning rates match. This includes
+	<ul>
+	<li>Scale = 1 on the left and Scale = 0.01 on the right. (Adjusted Learning Rate = 0.0001)</li>
+	<li>Scale = 10 on the left and Scale = 0.1 on the right. (Adjusted Learning Rate = 0.00001)</li>
+	<li>Scale = 100 on the left and Scale = 1 on the right. (Adjusted Learning Rate = 0.000001)</li>
+	</ul></li><br>
+	</ul>
+	</li>
+	<li>We want to know for what learning rates and what scales would yield the best results. So we are looking at the spread for the logits. Our prediction was that at all scales, if the model is training well, the range of the logits should fall into an acceptable range. We can see below. <center>
+	<span class="badge badge-dark">Scale Set A</span>
+	<span class="badge badge-primary">Learning Rate = 0.001</span>
+	<span class="badge badge-success">Learning Rate Adjusted</span>
+	<span class="badge badge-info">Gradient Descent Optimizer</span>
+	<span class="badge badge-warning">50 Epochs</span>
+	<span class="badge badge-danger">Fixed Random State</span><br></center>	<hr>
+	<table class="table table-sm table-condensed table-responsive borderless">
+	<tr>
+	<th style="text-align:center;">Accuracy</th>
+	<th style="text-align:center;">StDev: Scaled Logits</th>
+	</tr>
+	<tr>
+	<td style="text-align:center;"><img src="/logits/FCGD1e-3TTA50-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/FCGD1e-3TTA50-STD.jpg" width="300px"></td>
+	</tr>
+	</table><br>
+	Note that for the better models, the StDev of the scaled logits are about 2.5 to 20. For larger scales, the StDev first decreases, then increases again (which is imaginable after training for a longer time). It is clear that the initial StDev of the logits are exactly proportional to the scale because we fixed the random seed. Recall that our graphs start at the 21st data points for the StDev.<br><center>
+	<span class="badge badge-dark">Scale Set B</span>
+	<span class="badge badge-primary">Learning Rate = 0.001</span>
+	<span class="badge badge-success">Learning Rate Unadjusted</span>
+	<span class="badge badge-info">Gradient Descent Optimizer</span>
+	<span class="badge badge-warning">50 Epochs</span>
+	<span class="badge badge-danger">Fixed Random State</span><br></center>	<hr>
+	<table class="table table-sm table-condensed table-responsive borderless">
+	<tr>
+	<th style="text-align:center;">Accuracy</th>
+	<th style="text-align:center;">StDev: Scaled Logits</th>
+	</tr>
+	<tr>
+	<td style="text-align:center;"><img src="/logits/FCGD1e-3FTB50-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/FCGD1e-3FTB50-STD.jpg" width="300px"></td>
+	</tr>
+	</table><br>Still True. 2.5 to 20. Even for very small scales like 0.01.<br><center>
+	<span class="badge badge-dark">Scale Set C</span>
+	<span class="badge badge-primary">Learning Rate = 0.001</span>
+	<span class="badge badge-success">Learning Rate Unadjusted</span>
+	<span class="badge badge-info">Adam Optimizer</span>
+	<span class="badge badge-warning">50 Epochs</span>
+	<span class="badge badge-danger">Fixed Random State</span><br></center>	<hr>
+	<table class="table table-sm table-condensed table-responsive borderless">
+	<tr>
+	<th style="text-align:center;">Accuracy</th>
+	<th style="text-align:center;">StDev: Scaled Logits</th>
+	</tr>
+	<tr>
+	<td style="text-align:center;"><img src="/logits/FCAD1e-3FTC50-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/FCAD1e-3FTC50-STD.jpg" width="300px"></td>
+	</tr>
+	</table><br>This is the strongest graph that shows that the logit ranges should fall into an acceptable region. Note that the initial StDev is very small because of the very small scales we put here. Although for Set D it is no longer true - although the StDev keeps decreasing and gap between scaled logits of different scales become smaller. (We did not put the graphs here because it is not in logarithmic scale. You can see these <a href="logitdemo.html">here</a>)<br><center>
+	<span class="badge badge-dark">Scale Set B</span>
+	<span class="badge badge-primary">Learning Rate = 0.0001</span>
+	<span class="badge badge-success">Learning Rate Unadjusted</span>
+	<span class="badge badge-info">Gradient Descent Optimizer</span>
+	<span class="badge badge-warning">50 Epochs</span>
+	<span class="badge badge-danger">Fixed Random State</span><br></center><hr>	
+	<table class="table table-sm table-condensed table-responsive borderless">
+	<tr>
+	<th style="text-align:center;">Accuracy</th>
+	<th style="text-align:center;">StDev: Scaled Logits</th>
+	</tr>
+	<tr>
+	<td style="text-align:center;"><img src="/logits/FCGD1e-4FTB50-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/FCGD1e-4FTB50-STD.jpg" width="300px"></td>
+	</tr>
+	</table><br>
+	This is a different learning rate (0.0001). Note that still the scaled logits of the better models are converging to the range between 2.5 to 20(ish).</li><br>
+	<li> Scaled Logits StDev Comparison of Gradient Descent and Adam Optimizer<center>
+	<span class="badge badge-primary">Learning Rate = 0.001</span>
+	<span class="badge badge-success">Learning Rate Unadjusted</span>
+	<span class="badge badge-warning">50 Epochs</span>
+	<span class="badge badge-danger">Fixed Random State</span><br></center>	<hr>
+	<table class="table table-sm table-condensed table-responsive borderless">
+	<tr>
+	<td>&nbsp;</td>
+	<td style="text-align:center;"><span class="badge badge-info">Gradient Descent Optimizer</span></td>
+	<td style="text-align:center;"><span class="badge badge-info">Adam Optimizer</span></td>
+	</tr>
+	<tr>
+	<td style="vertical-align:middle;text-align:center;">
+	<span class="badge badge-dark">Scale Set A</span>
+	</td>
+	<td style="text-align:center;"><img src="/logits/FCGD1e-3FTA50-STD.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/FCAD1e-3FTA50-STD.jpg" width="300px"></td>
+	</tr>
+	<tr>
+	<td style="vertical-align:middle;text-align:center;">
+	<span class="badge badge-dark">Scale Set B</span>
+	</td>
+	<td style="text-align:center;"><img src="/logits/FCGD1e-3FTB50-STD.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/FCAD1e-3FTB50-STD.jpg" width="300px"></td>
+	</tr>
+	</table><br>
+	Since Adam Optimizer is usually the optimizer we used, we are looking at the StDev of the scaled logits. We can see that the range is not 2.5 to 20 anymore, but it is much larger. Would it be the case that using Adam Optimizer, the prediction is good already and they wanted to make it closer to a hardmax?</li><br>
+	<li> Training Error and Test Error.<center>
+	<span class="badge badge-dark">Scale Set A</span>
+	<span class="badge badge-success">Learning Rate Adjusted</span>
+	<span class="badge badge-info">Adam Optimizer</span>
+	<span class="badge badge-warning">10 Epochs</span>
+	<span class="badge badge-danger">Fixed Random State</span><br></center>	<hr>
+	<table class="table table-sm table-condensed table-responsive borderless">
+	<tr>
+	<td>&nbsp;</td>
+	<td style="text-align:center;"><span class="badge badge-primary">Learning Rate = 0.001</span></td>
+	<td style="text-align:center;"><span class="badge badge-primary">Learning Rate = 0.00001</span></td>
+	</tr>
+	<tr>
+	<th style="vertical-align:middle;text-align:center;">
+	Training Error
+	</th>
+	<td style="text-align:center;"><img src="/logits/FCAD1e-3TTA10-TRAIN.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/FCAD1e-5TTA10-TRAIN.jpg" width="300px"></td>
+	</tr>
+	<tr>
+	<th style="vertical-align:middle;text-align:center;">
+	Test Error
+	</th>
+	<td style="text-align:center;"><img src="/logits/FCAD1e-3TTA10-TEST.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/FCAD1e-5TTA10-TEST.jpg" width="300px"></td>
+	</tr>
+	</table><br>
+	We just include the training and test error here, for two different learning rate (a new learning rate 1e-5!) Note that the y-axis denotes the percentage of the initial error. For learning rate = 0.001, because the error decreases very quickly, we started at the 6th data points. Note that in both cases, because the learning rate is adjusted, the error is decreased more slowly for large scales.</li>
+	</ul>
+</p>
+ <p>&nbsp;</p>
+   <h5 id="cnn">Convolutional Neural Networks</h5>
+   <p>&nbsp;</p>
+   <p>   Since the training time is much longer for our CNN models, we are just run 10 epochs and we just have a few graphs shown below.</p>
+   <p>&nbsp;</p>
+   <p><h6>Type 1</h6></p>
+    <ul>
+  <li>A Typical graph would be like below.<center>
+	<span class="badge badge-dark">Scale Set A</span>
+	<span class="badge badge-primary">Learning Rate = 0.001</span>
+	<span class="badge badge-success">Learning Rate Adjusted</span>
+	<span class="badge badge-info">Adam Optimizer</span>
+	<span class="badge badge-warning">10 Epochs</span>
+	<span class="badge badge-danger">Fixed Random State</span><br>
+	<img src="/logits/C1AD1e-3TTA10-ACC.jpg"></center><br>
+	We can see that the learning time is greatly affected by the scale. We can either not adjust the learning rate, or increase the base learning rate.</li><br>
+	<li>These are the deviations from the above graphs<center>
+	<span class="badge badge-dark">Scale Set A</span>
+	<span class="badge badge-primary">Learning Rate = 0.001</span>
+	<span class="badge badge-success">Learning Rate Adjusted</span>
+	<span class="badge badge-info">Adam Optimizer</span>
+	<span class="badge badge-warning">10 Epochs</span>
+	<span class="badge badge-danger">Fixed Random State</span><br></center>
+	<table class="table table-sm table-condensed table-responsive borderless">
+	<tr>
+	<th>&nbsp;</th>
+	<th style="text-align:center;">Accuracy</th>
+	<th style="text-align:center;">Scaled Logits StDev</th>
+	</tr>
+	<tr>
+	<th style="vertical-align:middle;text-align:center;">
+	Original
+	</th>
+	<td style="text-align:center;"><img src="/logits/C1AD1e-3TTA10-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/C1AD1e-3TTA10-STD.jpg" width="300px"></td>
+	</tr>
+		<tr>
+	<td style="vertical-align:middle;text-align:center;">
+	<span class="badge badge-primary">Learning Rate = 0.1</span>
+	</td>
+	<td style="text-align:center;"><img src="/logits/C1AD1e-1TTA10-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/C1AD1e-1TTA10-STD.jpg" width="300px"></td>
+	</tr>
+			<tr>
+	<td style="vertical-align:middle;text-align:center;">
+	<span class="badge badge-primary">Learning Rate = 0.01</span>
+	</td>
+	<td style="text-align:center;"><img src="/logits/C1AD1e-2TTA10-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/C1AD1e-2TTA10-STD.jpg" width="300px"></td>
+	</tr>
+			<tr>
+	<td style="vertical-align:middle;text-align:center;">
+	<span class="badge badge-primary">Learning Rate = 0.0001</span>
+	</td>
+	<td style="text-align:center;"><img src="/logits/C1AD1e-4TTA10-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/C1AD1e-4TTA10-STD.jpg" width="300px"></td>
+	</tr>
+			<tr>
+	<td style="vertical-align:middle;text-align:center;">
+	<span class="badge badge-success">Learning Rate Unadjusted</span>
+	</td>
+	<td style="text-align:center;"><img src="/logits/C1AD1e-3FTA10-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/C1AD1e-3FTA10-STD.jpg" width="300px"></td>
+	</tr>			
+	<tr>
+	<td style="vertical-align:middle;text-align:center;">
+	<span class="badge badge-dark">Scale Set B</span>
+	</td>
+	<td style="text-align:center;"><img src="/logits/C1AD1e-3TTB10-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/C1AD1e-3TTB10-STD.jpg" width="300px"></td>
+	</tr>	</table><br>
+	It is interesting that for Scale Set A, the standard deviation of the logits are mainly in a comfortable range regardless of the scales. It is met with an example of bad range with a bad result in Scale Set B. (Scale = 100)<br> It also confirms the above mentioned suggestion - the accuracy increases when we increase the learning rate or not to adjust the learning rate.	</li><br>
+</ul>
+  <p>&nbsp;</p>
+     <p><h6>Type 2</h6></p>
+    <ul>
+  <li>A Typical graph would be like below.<center>
+	<span class="badge badge-dark">Scale Set A</span>
+	<span class="badge badge-primary">Learning Rate = 0.01</span>
+	<span class="badge badge-success">Learning Rate Adjusted</span>
+	<span class="badge badge-info">Adam Optimizer</span>
+	<span class="badge badge-warning">10 Epochs</span>
+	<span class="badge badge-danger">Fixed Random State</span><br>
+	<img src="/logits/C2AD1e-2TTA10-ACC.jpg"></center><br>
+	For this CNN model, it seems that a learning rate of 0.01 is too huge so that a smaller scale of 0.1 with learning rate adjusted does not work.</li><br>
+	<li>These are the deviations from the above graphs<center>
+	<span class="badge badge-dark">Scale Set A</span>
+	<span class="badge badge-primary">Learning Rate = 0.01</span>
+	<span class="badge badge-success">Learning Rate Adjusted</span>
+	<span class="badge badge-info">Adam Optimizer</span>
+	<span class="badge badge-warning">10 Epochs</span>
+	<span class="badge badge-danger">Fixed Random State</span><br></center>
+	<table class="table table-sm table-condensed table-responsive borderless">
+	<tr>
+	<th>&nbsp;</th>
+	<th style="text-align:center;">Accuracy</th>
+	<th style="text-align:center;">Scaled Logits StDev</th>
+	</tr>
+	<tr>
+	<th style="vertical-align:middle;text-align:center;">
+	Original
+	</th>
+	<td style="text-align:center;"><img src="/logits/C2AD1e-2TTA10-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/C2AD1e-2TTA10-STD.jpg" width="300px"></td>
+	</tr>
+		<tr>
+	<td style="vertical-align:middle;text-align:center;">
+	<span class="badge badge-primary">Learning Rate = 0.001</span>
+	</td>
+	<td style="text-align:center;"><img src="/logits/C2AD1e-3TTA10-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/C2AD1e-3TTA10-STD.jpg" width="300px"></td>
+	</tr>
+			<tr>
+	<td style="vertical-align:middle;text-align:center;">
+	<span class="badge badge-success">Learning Rate Unadjusted</span>
+	</td>
+	<td style="text-align:center;"><img src="/logits/C2AD1e-2FTA10-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/C2AD1e-2FTA10-STD.jpg" width="300px"></td>
+	</tr>			
+	<tr>
+	<td style="vertical-align:middle;text-align:center;">
+	<span class="badge badge-dark">Scale Set B</span>
+	</td>
+	<td style="text-align:center;"><img src="/logits/C2AD1e-2TTB10-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/C2AD1e-2TTB10-STD.jpg" width="300px"></td>
+	</tr>
+	<tr>
+	<td style="vertical-align:middle;text-align:center;">
+	<span class="badge badge-danger">Random State</span>
+	</td>
+	<td style="text-align:center;"><img src="/logits/C2AD1e-2TFA10-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/C2AD1e-2TFA10-STD.jpg" width="300px"></td>
+	</tr>
+	</table><br>
+	The surprising thing is that the scaled logits for scale = 0.1 are very small either. It seems not adjusting the learning rate would be better. Note that in this model, it seems that no scaling would do the job. The scaled logits are also in a comfortable range.</li><br>
+</ul>
+  <p>&nbsp;</p>
+       <p><h6>Type 3</h6></p>
+    <ul>
+  <li>A Typical graph would be like below.<center>
+	<span class="badge badge-dark">Scale Set A</span>
+	<span class="badge badge-primary">Learning Rate = 0.01</span>
+	<span class="badge badge-success">Learning Rate Adjusted</span>
+	<span class="badge badge-info">Adam Optimizer</span>
+	<span class="badge badge-warning">10 Epochs</span>
+	<span class="badge badge-danger">Fixed Random State</span><br>
+	<img src="/logits/C3AD1e-2TTA10-ACC.jpg"></center><br>
+	It seems like this model works a lot better than the last one.</li><br>
+	<li>These are the deviations from the above graphs<center>
+	<span class="badge badge-dark">Scale Set A</span>
+	<span class="badge badge-primary">Learning Rate = 0.01</span>
+	<span class="badge badge-success">Learning Rate Adjusted</span>
+	<span class="badge badge-info">Adam Optimizer</span>
+	<span class="badge badge-warning">10 Epochs</span>
+	<span class="badge badge-danger">Fixed Random State</span><br></center>
+	<table class="table table-sm table-condensed table-responsive borderless">
+	<tr>
+	<th>&nbsp;</th>
+	<th style="text-align:center;">Accuracy</th>
+	<th style="text-align:center;">Scaled Logits StDev</th>
+	</tr>
+	<tr>
+	<th style="vertical-align:middle;text-align:center;">
+	Original
+	</th>
+	<td style="text-align:center;"><img src="/logits/C3AD1e-2TTA10-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/C3AD1e-2TTA10-STD.jpg" width="300px"></td>
+	</tr>
+		<tr>
+	<td style="vertical-align:middle;text-align:center;">
+	<span class="badge badge-primary">Learning Rate = 0.001</span>
+	</td>
+	<td style="text-align:center;"><img src="/logits/C3AD1e-3TTA10-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/C3AD1e-3TTA10-STD.jpg" width="300px"></td>
+	</tr>
+			<tr>
+	<td style="vertical-align:middle;text-align:center;">
+	<span class="badge badge-success">Learning Rate Unadjusted</span>
+	</td>
+	<td style="text-align:center;"><img src="/logits/C3AD1e-2FTA10-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/C3AD1e-2FTA10-STD.jpg" width="300px"></td>
+	</tr>			
+	<tr>
+	<td style="vertical-align:middle;text-align:center;">
+	<span class="badge badge-dark">Scale Set B</span>
+	</td>
+	<td style="text-align:center;"><img src="/logits/C3AD1e-2TTB10-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/C3AD1e-2TTB10-STD.jpg" width="300px"></td>
+	</tr>
+	<tr>
+	<td style="vertical-align:middle;text-align:center;">
+	<span class="badge badge-danger">Random State</span>
+	</td>
+	<td style="text-align:center;"><img src="/logits/C3AD1e-2TFA10-ACC.jpg" width="300px"></td>
+	<td style="text-align:center;"><img src="/logits/C3AD1e-2TFA10-STD.jpg" width="300px"></td>
+	</tr>
+	</table><br>
+	I am surprised that none failed. Even all scales in Scale Set B.</li><br>
+</ul>
+  <p>&nbsp;</p>
+<h4 id="conclusion"><b>Conclusion</b></h4>
+  <p>&nbsp;</p>
+  We can say with some (vague) statements.
+  <ul>
+  <li><b>Logit Scales do affect our model and training. It seems to me that before training, one should check the logits with your favourite weights initialization method, and scale it down accordingly, instead of using the weights to do the work. c.f. normalizing the units to have mean 0 and variance 1 instead of not doing it and let the bias trained.</b> </li>
+  <li><b>It is a hyperparameter which correlates very closely to the learning rate. For some cases they are highly correlated</b></li>
+  <li><b>It works differently for Gradient Descent Optimizer and Adam Optimizer. (Duh!)</b></li>
+  <li><b>Of course it depends greatly of your model (Duh!)</b></li>
+  </ul>
+  <p>&nbsp;</p>
+<h4 id="sourcecode"><b>Code</b></h4>
+  <p>&nbsp;</p>
+  <p>
+
+  <div class="card">
+    <div class="card-header" role="tab" id="headingOne">
+      <h5 class="mb-0">
+        <a data-toggle="collapse" href="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
+          Code (Python)
+        </a>
+      </h5>
+    </div>
+
+    <div id="collapseOne" class="collapse" role="tabpanel" aria-labelledby="headingOne">
+<pre><code class="python">
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import tensorflow as tf
+import time
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import OneHotEncoder
+df = pd.read_csv('../input/train.csv')	  
+Xtrain, Xtest, ytrain, ytest = train_test_split(df.iloc[:,1:],
+                                                df.iloc[:,0],
+                                                train_size=0.98, 
+                                                test_size=0.02, 
+                                                random_state=0)
+Xtrain=np.array(Xtrain).reshape(-1,28,28,1)
+Xtest=np.array(Xtest).reshape(-1,28,28,1)
+enc = OneHotEncoder()
+ytrain= enc.fit_transform(np.array(ytrain).reshape(-1,1)).toarray()
+ytest= enc.transform(np.array(ytest).reshape(-1,1)).toarray()	  
+	  
+#Several network architecture. the input x is the input placeholder and return a logit tensor.
+def fc(x):
+    n_train = tf.shape(x)[0]
+    net = tf.reshape(x, [n_train, 784])
+    net = tf.contrib.layers.fully_connected(net, 196, activation_fn=tf.nn.relu)
+    net = tf.contrib.layers.fully_connected(net, 49, activation_fn=tf.nn.relu)
+    return tf.contrib.layers.fully_connected(net, 10, activation_fn=None)
+
+def cnn1(x):
+    net = tf.layers.conv2d(x,8,[5, 5],strides=(1,1),padding="valid",activation=tf.tanh)
+    net = tf.layers.max_pooling2d(inputs=net, pool_size=[2, 2], strides=2)
+    net = tf.layers.conv2d(net,32, [5,5], strides=(1,1), padding="valid", activation=tf.tanh)
+    net = tf.layers.max_pooling2d(inputs=net, pool_size=[2, 2], strides=2)
+    net = tf.layers.conv2d(net,1, [1,1], strides=(1,1), padding="same", activation=None)
+    n_train = tf.shape(net)[0]
+    net = tf.reshape(net, [n_train, 16])
+    return tf.contrib.layers.fully_connected(net, 10, activation_fn=None)
+
+def cnn2(x):
+    net = tf.layers.conv2d(x , 4, [5,5], strides=(1,1), padding="valid", activation=tf.tanh)
+    net = tf.layers.conv2d(net,4, [5,5], strides=(1,1), padding="valid", activation=tf.tanh)
+    net = tf.layers.conv2d(net,4, [5,5], strides=(1,1), padding="valid", activation=tf.tanh)
+    net = tf.layers.conv2d(net,4, [5,5], strides=(1,1), padding="valid", activation=tf.tanh)
+    net = tf.layers.conv2d(net,4, [5,5], strides=(1,1), padding="valid", activation=tf.tanh)
+    net = tf.layers.conv2d(net,4, [5,5], strides=(1,1), padding="valid", activation=tf.tanh)
+    net = tf.layers.conv2d(net,1, [1,1], strides=(1,1), padding="valid", activation=tf.tanh)
+    n_train = tf.shape(net)[0]
+    net = tf.reshape(net, [n_train, 16])
+    return tf.contrib.layers.fully_connected(net, 10, activation_fn=None)
+
+def cnn3(x):
+    net = tf.layers.conv2d(x,16,[3, 3],strides=(1,1),padding="valid",activation=tf.tanh)
+    net = tf.layers.max_pooling2d(inputs=net, pool_size=[2, 2], strides=2)
+    net = tf.layers.conv2d(net,64, [4,4], strides=(1,1), padding="valid", activation=tf.tanh)
+    net = tf.layers.max_pooling2d(inputs=net, pool_size=[2, 2], strides=2)
+    net = tf.layers.conv2d(net,1, [1,1], strides=(1,1), padding="same", activation=None)
+    n_train = tf.shape(net)[0]
+    net = tf.reshape(net, [n_train, 25])
+    return tf.contrib.layers.fully_connected(net, 10, activation_fn=None)	  
+
+def runnet(Xtrain, Xtest, ytrain, ytest, 
+           func,
+           epochs = 5,
+           scale = 1, 
+           base_lr = 0.001, 
+           learning_rate_adjusted = False, 
+           op = 'GD',
+           seed=None):
+    #Check Validity of the above defined functions
+    if func not in [cnn1,cnn2,cnn3,fc]:
+        print('Input Function Incorrect!')
+        return
+    if op not in ['GD','AD']:
+        print('Optimizers are GradientDescentOptimizer ("GD") or AdamOptimizer ("AD")')
+        return
+    #Enable Reverse One-Hot By Multiplying numlist
+    numlist=np.array([0,1,2,3,4,5,6,7,8,9])
+    tf.reset_default_graph()
+    tf.set_random_seed(seed)
+    x = tf.placeholder(tf.float32, shape=[None, 28,28,1])
+    y = tf.placeholder(tf.float32, shape = [None, 10])
+    lr = tf.placeholder(tf.float32, shape = [])
+    out = func(x) * scale #Scaled Logits
+    loss=tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y, logits=out))
+    if op == 'GD':
+        train_step = tf.train.GradientDescentOptimizer(lr).minimize(loss)
+    elif op == 'AD':
+        train_step = tf.train.AdamOptimizer(lr).minimize(loss)
+    bs = 1024 #batch_size
+    #For plotting purposes
+    acclist=[] 
+    stdlist=[]
+    #trainlist=[]
+    #testlist=[]
+    if learning_rate_adjusted:
+        rate = base_lr / scale 
+    else:
+        rate = base_lr
+    with tf.Session() as sess:
+        sess.run(tf.global_variables_initializer())
+        #initial error
+        er=sess.run(loss, feed_dict={x:Xtrain[:1], y:ytrain[:1], lr: 0})
+        print('Running: Scale={}, BaseLR={}, LR_Adjusted={}, Seed={}, Optimizer={}'.format(
+            scale, base_lr, learning_rate_adjusted, seed, op))
+        print('Initial Logits StDev: ',np.std(sess.run(out, feed_dict={x:Xtest})))
+        for i in range(epochs):
+            tic = time.time()
+            #ignore last incomplete batch
+            for j in range(len(Xtrain)//bs):
+                _, er=sess.run([train_step, loss], feed_dict={
+                    x:Xtrain[j*bs:(j+1)*bs], 
+                    y:ytrain[j*bs:(j+1)*bs], 
+                    lr: rate})
+                ertest, pred = sess.run([loss,out], feed_dict={x:Xtest, y:ytest})
+                stdev = np.std(pred)
+                #Prediction Before Reverse One-Hot
+                pred=np.argmax(pred, axis=1)
+                #Accuracy of Prediction After Reverse One-Hot
+                acc=(pred==np.dot(ytest, numlist)).sum()/len(ytest)*100
+                if j%3==0:
+                    #print('Training Error: {:8.4f}\tTest Error: {:8.4f}\tAccuracy: {:5.2f}%'.format(er, ertest, acc))
+                    acclist.append(acc)
+                    stdlist.append(stdev)
+                    #trainlist.append(er)
+                    #testlist.append(ertest)
+            toc = time.time()
+            print('Epoch {}\tTraining Error: {:8.4f}\tTest Error: {:8.4f}\tAccuracy: {:5.2f}%\tTime: {:6.2f}s'.format(
+                i+1,er, ertest, acc, toc- tic))
+            tic = toc
+    return acclist, stdlist#, trainlist, testlist
+
+lrlist = [1e-2,1e-3,1e-4,1e-6]
+bstr = ["1e-2","1e-3","1e-4","1e-6"]
+scalelistlist = [[0.1,0.3,1,3,10],[0.01,0.1,1,10,100],[1e-8,1e-6,1e-4,1e-2,1],[1,100,1e4,1e6,1e8]]
+sstr = ["A","B","C","D"]
+#[0.1,0.3,1,3,10] #A
+#[0.01,0.1,1,10,100] #B
+#[1e-8,1e-6,1e-4,1e-2,1] #C
+#[1,100,1e4,1e6,1e8] #D
+op = "GD"
+ep=10
+adj=True
+sd=0
+for j in range(4):
+    for k in range(4):
+        ACC = []
+        STD = []
+        base_lr = lrlist[j]
+        scalelist = scalelistlist[k]
+        for scale in scalelist:
+            acclist, stdlist = runnet(Xtrain, Xtest, ytrain, ytest, 
+                                      fc, 
+                                      base_lr=base_lr,
+                                      epochs = ep,
+                                      scale=scale,
+                                      learning_rate_adjusted = adj,
+                                      op='GD',
+                                      seed=sd)
+            ACC.append(acclist)
+            STD.append(stdlist)
+        plt.title('Fully Connected - Accuracy\nBaseLR={}, LR Adjusted={}, Epochs={}, Seed={}'.format(
+            base_lr,adj,ep,sd))
+        for i in range(len(ACC)):
+            if len(ACC[i])>0:
+                plt.plot(ACC[i], label='Scale ='+str(scalelist[i]))
+        plt.legend()
+        plt.show()
+        plt.title('Fully Connected - Logits StDev\nBaseLR={}, LR Adjusted={}, Epochs={}, Seed={}'.format(
+            base_lr,adj,ep,sd))   
+        for i in range(len(STD)):
+            if len(STD[i][20:])>0:
+                plt.plot(STD[i][20:], label='Scale ='+str(scalelist[i]))
+        plt.legend()
+        plt.show()	
+</code></pre>
+    </div>
+  </div>
+
+  </p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<script>hljs.initHighlightingOnLoad();</script>
+      <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js" integrity="sha384-b/U6ypiBEHpOf/4+1nzFpr53nxSS+GLCkfwBdFNTxtclqqenISfwAzpKaMNFNmj4" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/js/bootstrap.min.js" integrity="sha384-h0AbiXch4ZDo7tp9hKZ4TsHbi047NrKGLO3SEJAg45jXxnGIfYzk4Si90RDIqNm1" crossorigin="anonymous"></script>
+</body></html>                           
