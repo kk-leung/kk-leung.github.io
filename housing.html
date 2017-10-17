@@ -140,14 +140,14 @@
 <h5 id="ensemble">Ensemble Training</h5>
 <p>Perhaps the biggest breakthrough was to use ensemble training. Again my friend <a href="gsscott.github.io">Geoff</a> suggested that he was exploring different models in scikit-learn and see if anything good would come out. At the final stage he proposed a method, as follows.</p>
 <p>He chose 5 fixed methods for the training data, one being a dummy one predicting the median, while the others are random forest, XGBoost, neural network, etc. After he trained the model for a while, he stacked the model by performing a linear regression on each predictions by each model. Then he repeated the same method again and again using boosting techniques - by predicting the residual error of the final prediction using the linear regression. His model block can be described by the graph below.</p>
-<p>PASS</p>
+<p align="center"><img src="geoffdiagram.jpg" class="img-fluid"></p>
 <p>After tweaking some hyperparameters, he was able to break through to get a much better place on the kaggle leaderboard.</p>
 <p>At the time we was working on a different <a href="image.html">project</a> as their deadline was approaching. After the deadline, we returned to Zillow and tried something that was similar to Geoff's method. We merely just picked several models, neural network, XGBoost, LightGBM and average the results. To our surprise, it already did much better than any of my previous methods.</p>
 <p>This suggested that ensmebling did help to get better output. (We will be talking about this below.) We tried to do boosting based on Geoff's method and found that even doing one boosting round would cause serious overfitting. Thus at the end we did not do any boosting at all.</p>
 <p>I tried to do some stupid thing to increase my score - for example, tweaking the weights of the models manually so that it gives a better score. Previuosly the weights were uniform (i.e. one-third on each model). I tweaked it to be something like (3,4,4) etc and it improved by some degrees. This makes me wonder if we could just tweak the weights using our <i>test set</i> instead of the training set.</p>
 <p>Then, we didn't know how this method arose, but what we did was to split the <i>test set</i> in half, and perform a linear regression on the first test set, using the second test set observed for overfitting. At the end we performed <i>quadratic regression</i> on the first test set, with early stopping and initialization on the first degree terms to be uniform, but zero initialization for the second degree terms. We tested our result using the resulting test sets and it worked quite well</p>
 <p>Our end model used 1 nerual network, 2 XGBoost models with different hyperparameters, and 2 LightGBM models with different hyperparameters.</p>
-<p>PASS</p>
+<p align="center"><img src="mydiagram.jpg" class="img-fluid"></p>
 <p>&nbsp;</p>
 <h4 id="testing"><b>Testing</b></h4>
  <p>&nbsp;</p>
