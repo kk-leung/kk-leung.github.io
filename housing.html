@@ -546,7 +546,7 @@ def quadratic_regression(pred, y, pred_test, y_test, lamb=1e-2, alpha=1e-3):
         return Wout
 		
 def get_predictions_quadratic(pred, W):
-    '''Getting prediction in the final quadratic model
+    '''Getting prediction in the final quadratic model'''
     poly = PolynomialFeatures(2)
     Xp=poly.fit_transform(np.array(pred))
     return np.dot(Xp,W)
